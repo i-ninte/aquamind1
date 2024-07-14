@@ -1,38 +1,48 @@
 import streamlit as st
-import pandas as pd
 import requests
+from pydantic import BaseModel
 
-st.title('AQUAMIND')
+# Define the input form for water quality parameters
+class WaterQualityInput(BaseModel):
+    temperature: float
+    do: float
+    ph: float
+    conductivity: float
+    bod: float
 
-st.sidebar.header('Input Features')
-temperature = st.sidebar.number_input("Temperature", min_value=0.0, step=0.1)
-do = st.sidebar.number_input("Dissolved Oxygen (DO)", min_value=0.0, step=0.1)
-ph = st.sidebar.number_input("pH Value", min_value=0.0, step=0.1)
-conductivity = st.sidebar.number_input("Conductivity", min_value=0.0, step=0.1)
-bod = st.sidebar.number_input("Biochemical Oxygen Demand (BOD)", min_value=0.0, step=0.1)
+# Function to get predictions from the FastAPI backend
+def get_prediction(input_data):
+    url = "http://127.0.0.1:8000/predict"  # Update this to your localhost URL
+    response = requests.post(url, json=input_data.dict())
+    return response.json()
 
-user_data = {
-    'temperature': temperature,
-    'do': do,
-    'ph': ph,
-    'conductivity': conductivity,
-    'bod': bod
-}
+# Streamlit app layout
+st.title("AquaMind Water Quality Prediction")
 
-if st.sidebar.button('Predict Water Quality'):
-    response = requests.post("http://127.0.0.1:8000/predict", json=user_data)
-    if response.status_code == 200:
-        prediction = response.json()['quality']
-        st.subheader(f'Predicted Water Quality: {prediction}')
-        if prediction == "Potable":
-            st.success('The water is potable.')
-        else:
-            st.error('The water is not potable.')
-    else:
-        st.error(f"Error: {response.status_code}, {response.text}")
+# Collect user inputs
+temperature = st.number_input("Enter the temperature value:", min_value=0.0, max_value=100.0, value=25.0)
+do = st.number_input("Enter the dissolved oxygen value:", min_value=0.0, max_value=20.0, value=7.0)
+ph = st.number_input("Enter the pH value:", min_value=0.0, max_value=14.0, value=7.0)
+conductivity = st.number_input("Enter the conductivity value:", min_value=0.0, max_value=1000.0, value=300.0)
+bod = st.number_input("Enter the BOD value:", min_value=0.0, max_value=100.0, value=3.0)
 
-st.markdown("""
-### AQUAMIND
-This app predicts the quality of water based on various input features.
-Adjust the features in the sidebar and click 'Predict Water Quality' to see the prediction.
-""")
+# Submit button
+if st.button("Predict"):
+    input_data = WaterQualityInput(
+        temperature=temperature,
+        do=do,
+        ph=ph,
+        conductivity=conductivity,
+        bod=bod
+    )
+    result = get_prediction(input_data)
+    
+    # Display the prediction result
+    st.subheader("Prediction Result")
+    st.write(f"Predicted water quality: {result['quality']}")
+    st.write(f"Prediction confidence: {result['confidence']:.2f}")
+    st.write(f"Class probabilities: {result['probabilities']}")
+
+    # Display the input data for verification
+    st.subheader("Input Data")
+    st.write(input_data.dict())
